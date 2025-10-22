@@ -1,4 +1,5 @@
 from typing import List
+import math
 
 from ortools.sat.python import cp_model
 
@@ -18,8 +19,17 @@ REGION_BLOCKS = {
 }
 
 
-class VarMatrixSolutionReceiver(cp_model.CpSolverSolutionCallback):
+class SudokuSolutionReceiver(cp_model.CpSolverSolutionCallback):
+    '''
+    the solution receiver of constraint programming
+    '''
     def __init__(self, variables: List[List[cp_model.IntVar]]):
+        '''
+        initialise
+
+        @param variables: the decision variables of the model
+        '''
+
         super().__init__()
 
         self.variables = variables
@@ -28,6 +38,10 @@ class VarMatrixSolutionReceiver(cp_model.CpSolverSolutionCallback):
         self.solutions = []
 
     def on_solution_callback(self):
+        '''
+        the callback method to get all the solutions, overriding
+        '''
+
         self.solution_count += 1
 
         solution = [[0 for _ in range(NUM_FIGURE)] for _ in range(NUM_FIGURE)]
@@ -39,16 +53,31 @@ class VarMatrixSolutionReceiver(cp_model.CpSolverSolutionCallback):
         self.solutions.append(solution)
 
 
-class SudokuCPModel(object):
+class SudokuCPSolver(object):
+    '''
+    the solver of sudoku game based on constraint programming
+    '''
+
     def __init__(self, info: List[List[int]]):
+        '''
+        initialise
+
+        @param info: the initial information of the sudoku game
+        '''
+
         self.info = info
 
         self.solutions = []
         self.unique_solution = None
 
     def run(self):
+        '''
+        build the model and solve
+        '''
+
         model = cp_model.CpModel()
 
+        # bool variables: if a number is in a specific block
         x = [[[model.NewBoolVar(name=f'x_{i + 1}_{j + 1}_{n + 1}') 
                for n in range(1, 10)] for j in range(1, 10)] for i in range(1, 10)]
 
@@ -80,7 +109,7 @@ class SudokuCPModel(object):
                 model.Add(sum(x[i][j][n] for i, j in blocks) == 1)
 
         solver = cp_model.CpSolver()
-        solution_receiver = VarMatrixSolutionReceiver(variables=x)
+        solution_receiver = SudokuSolutionReceiver(variables=x)
         status = solver.SearchForAllSolutions(model=model, callback=solution_receiver)
         print()
         print(f'status = {solver.StatusName(status=status)}', '\n')
@@ -89,14 +118,27 @@ class SudokuCPModel(object):
         self.solutions = solution_receiver.solutions
         if solution_receiver.solution_count == 1:
             self.unique_solution = self.solutions[0]
-            print('the unique solution:')
-            for row in self.unique_solution:
-                print(row)
-            print()
+            self.print_solution()
+
+    def print_solution(self):
+        '''
+        print the solution
+        '''
+
+        print('the unique solution:', '\n')
+        for i in range(NUM_FIGURE):
+            line = ''
+            for j in range(NUM_FIGURE):
+                space = '' if j == NUM_FIGURE - 1 else '   ' if not (j + 1) % int(math.sqrt(NUM_FIGURE)) else '  '
+                line += str(self.unique_solution[i][j]) + space
+            print(line)
+
+            if not (i + 1) % int(math.sqrt(NUM_FIGURE)):
+                print()
+        print()
 
 
 if __name__ == '__main__':
-    # the info template of 9-figure sudoku
     info_template = [
         [0, 0, 0,  0, 0, 0,  0, 0, 0], 
         [0, 0, 0,  0, 0, 0,  0, 0, 0], 
@@ -111,19 +153,20 @@ if __name__ == '__main__':
         [0, 0, 0,  0, 0, 0,  0, 0, 0]
     ]
 
+    # example: a simple 17 sudoku
     info = [
-        [7, 0, 9,  4, 0, 0,  0, 6, 8], 
-        [0, 0, 0,  0, 2, 0,  0, 4, 0], 
-        [0, 0, 3,  0, 0, 0,  0, 0, 0], 
+        [0, 6, 9,  0, 0, 0,  2, 0, 0], 
+        [0, 0, 0,  3, 0, 1,  0, 0, 0], 
+        [0, 1, 0,  0, 0, 0,  0, 0, 0], 
 
-        [0, 6, 0,  0, 0, 0,  0, 0, 0], 
-        [0, 0, 0,  0, 0, 1,  5, 0, 0], 
-        [8, 0, 4,  2, 0, 0,  0, 0, 9], 
+        [8, 4, 0,  5, 0, 0,  0, 0, 0], 
+        [0, 0, 0,  0, 0, 0,  0, 9, 0], 
+        [0, 0, 0,  0, 6, 0,  0, 0, 0], 
 
-        [0, 3, 0,  7, 0, 0,  0, 0, 0], 
-        [0, 2, 0,  0, 0, 0,  0, 0, 6], 
-        [6, 0, 7,  0, 5, 0,  9, 0, 0]
+        [7, 0, 0,  8, 2, 0,  0, 0, 0], 
+        [0, 0, 0,  0, 0, 0,  6, 1, 0], 
+        [3, 0, 0,  0, 0, 0,  0, 0, 0]
     ]
 
-    sudoku_model = SudokuCPModel(info=info)
+    sudoku_model = SudokuCPSolver(info=info)
     sudoku_model.run()
